@@ -163,9 +163,10 @@ let
             cfg.registry.externalPort == 443 && cfg.https
           ) then null
           else cfg.registry.externalPort;
+        api_url = "http${optionalString (cfg.registry.https == true) "s"}://${config.services.dockerRegistry.listenAddress}:${toString config.services.dockerRegistry.port}/";
         key = cfg.registry.keyFile;
-        api_url = "http://${config.services.dockerRegistry.listenAddress}:${toString config.services.dockerRegistry.port}/";
         issuer = cfg.registry.issuer;
+        rootcertbundle = cfg.registry.caChainFile;
       };
       elasticsearch.indexer_path = "${pkgs.gitlab-elasticsearch-indexer}/bin/gitlab-elasticsearch-indexer";
       extra = {};
@@ -571,6 +572,15 @@ in {
           type = types.port;
           default = 4567;
           description = "GitLab container registry port.";
+        };
+        https = mkOption {
+          type = types.bool;
+          default = false;
+          description = "Connect to `services.dockerRegistry` using https.";
+        };
+        caChainFile = mkOption {
+          type = types.path;
+          description = "Path to GitLab container registry CA chain.";
         };
         certFile = mkOption {
           type = types.path;
@@ -1251,6 +1261,7 @@ in {
       enable = true;
       enableDelete = true; # This must be true, otherwise GitLab won't manage it correctly
       package = cfg.registry.package;
+      listenAddress = cfg.registry.host;
       port = cfg.registry.port;
       extraConfig = {
         auth.token = {
@@ -1258,6 +1269,12 @@ in {
           service = cfg.registry.serviceName;
           issuer = cfg.registry.issuer;
           rootcertbundle = cfg.registry.certFile;
+        };
+      } // optionalAttrs cfg.registry.https {
+        http.tls = {
+          certificate = cfg.registry.certFile;
+          key = cfg.registry.keyFile;
+          minimumtls = "tls1.2";
         };
       };
     };
